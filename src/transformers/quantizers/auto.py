@@ -251,7 +251,7 @@ class AutoHfQuantizer:
         if isinstance(quantization_config, LOADING_ATTRIBUTES_CONFIG_TYPES) and isinstance(
             quantization_config_from_args, LOADING_ATTRIBUTES_CONFIG_TYPES
         ):
-            loading_attr_dict = quantization_config_from_args.get_loading_attributes()  # type: ignore[union-attr]
+            loading_attr_dict = quantization_config_from_args.get_loading_attributes()
             for attr, val in loading_attr_dict.items():
                 setattr(quantization_config, attr, val)
 
