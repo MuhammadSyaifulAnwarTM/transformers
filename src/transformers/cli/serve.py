@@ -1365,7 +1365,7 @@ class Serve:
         chat_result = require_batch_encoding(
             processor.apply_chat_template(inputs, add_generation_prompt=True, return_tensors="pt", return_dict=True)
         )
-        inputs = cast(TensorLike, chat_result.to(model.device)["input_ids"])
+        inputs = chat_result.to(model.device)["input_ids"]
         request_id = req.get("previous_response_id", "req_0")
 
         # Temporary hack for GPT-OSS 1: don't filter special tokens
