@@ -800,6 +800,57 @@ class FooTextForCausalLM(FooTextPreTrainedModel):
             trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
             self.assertEqual(trf014, [])
 
+    def test_trf014_only_checks_target_config_class(self):
+        """Non-target sub-configs must not suppress a missing tie_word_embeddings on the main config."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            config_source = """
+class FooVisionConfig(FooConfig):
+    model_type = "foo_vision"
+
+class FooConfig(PreTrainedConfig):
+    model_type = "foo"
+"""
+            (model_dir / "configuration_foo.py").write_text(config_source)
+
+            modeling_source = """
+class FooPreTrainedModel(PreTrainedModel):
+    pass
+
+class FooForConditionalGeneration(FooPreTrainedModel):
+    _tied_weights_keys = {"lm_head.weight": "model.language_model.embed_tokens.weight"}
+"""
+            file_path = model_dir / "modeling_foo.py"
+            violations = mlinter.analyze_file(file_path, modeling_source, enabled_rules={mlinter.TRF014})
+            trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
+            self.assertEqual(len(trf014), 1)
+            self.assertIn("tie_word_embeddings", trf014[0].message)
+
+    def test_trf014_resolves_inherited_config_class(self):
+        """The tied model should use its resolved config_class, not the shortest class-name prefix."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            model_dir = Path(tmpdir)
+            config_source = """
+class FooConfig(PreTrainedConfig):
+    hidden_size: int = 768
+
+class FooTextConfig(PreTrainedConfig):
+    tie_word_embeddings: bool = True
+"""
+            (model_dir / "configuration_foo.py").write_text(config_source)
+
+            modeling_source = """
+class FooPreTrainedModel(PreTrainedModel):
+    config_class = FooTextConfig
+
+class FooForCausalLM(FooPreTrainedModel):
+    _tied_weights_keys = {"lm_head.weight": "model.embed_tokens.weight"}
+"""
+            file_path = model_dir / "modeling_foo.py"
+            violations = mlinter.analyze_file(file_path, modeling_source, enabled_rules={mlinter.TRF014})
+            trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
+            self.assertEqual(trf014, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -59,6 +59,7 @@ description: Add a new TRF rule to the mlinter. Checks for duplicates, creates t
    - Add at least one positive test (valid code, no violations) and one negative test (bad code, expected violation).
    - Follow the pattern of existing tests: create source strings, call `mlinter.analyze_file()`, and assert on violations.
    - For cross-file rules (rules that read config or other files from disk), use `tempfile.TemporaryDirectory` to create real file structures. The test file already imports `tempfile`.
+   - If the rule maps a modeling class to a specific config class, add a regression where another config class in the same file would otherwise cause a false positive/false negative.
    - Run the tests:
      ```bash
      python -m pytest tests/repo_utils/test_mlinter.py -x -v -k "trfXXX"
@@ -76,6 +77,14 @@ The mlinter processes files **one at a time** via `analyze_file(file_path, text,
 
 ### Multi-config directories
 Some model directories contain multiple configuration files (e.g., `data2vec/` has `configuration_data2vec_audio.py`, `configuration_data2vec_text.py`, `configuration_data2vec_vision.py`). When finding a config file for a modeling file, **match by suffix first**: `modeling_foo_text.py` -> `configuration_foo_text.py`. Only fall back to picking the first config file if there's a single one or no suffix match. See `trf014.py:_find_config_file()` for the pattern.
+
+### Multi-class configuration files
+A single `configuration_*.py` file can define multiple config classes (e.g., a main config plus text/vision sub-configs). If the rule is checking a property that should belong to one specific config class, **do not scan the file and accept the first matching class**. First resolve the modeling class's target config class:
+
+- Prefer `config_class` from the model class, following local modeling inheritance if it is declared on a parent `*PreTrainedModel`.
+- If there is no explicit `config_class`, infer the best match from class names, typically by longest shared prefix (`FooTextForCausalLM` -> `FooTextConfig`, not `FooConfig`).
+
+Then validate only that config class. This avoids early-return bugs where an unrelated sub-config masks a missing field on the actual target config.
 
 ### Inherited configs
 Some config classes inherit from another model's config rather than directly from `PreTrainedConfig` (e.g., `VoxtralRealtimeTextConfig(MistralConfig)`). These inherit fields like `tie_word_embeddings` from their parent. When checking for a field in a config class, **if the base class is not `PreTrainedConfig`/`PretrainedConfig` and ends with `Config`**, assume the field may be inherited and skip the violation.
