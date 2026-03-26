@@ -136,14 +136,25 @@ def _infer_config_class_name(model_class_name: str, config_class_names: list[str
     return max(candidates)[1]
 
 
-def _config_has_tie_word_embeddings(
+def _resolve_target_config_class_name(
     config_classes: dict[str, ast.ClassDef], model_class_name: str, config_class_name: str | None
-) -> bool:
-    """Check if the config class tied to a modeling class defines or inherits tie_word_embeddings."""
+) -> str | None:
+    """Resolve the concrete config class name that should be checked for a modeling class."""
     target_config_name = config_class_name
     if target_config_name not in config_classes:
         target_config_name = _infer_config_class_name(model_class_name, list(config_classes))
 
+    if target_config_name not in config_classes:
+        return None
+
+    return target_config_name
+
+
+def _config_has_tie_word_embeddings(
+    config_classes: dict[str, ast.ClassDef], model_class_name: str, config_class_name: str | None
+) -> bool:
+    """Check if the config class tied to a modeling class defines or inherits tie_word_embeddings."""
+    target_config_name = _resolve_target_config_class_name(config_classes, model_class_name, config_class_name)
     if target_config_name is None:
         return True
 
@@ -225,6 +236,9 @@ def check(tree: ast.Module, file_path: Path, source_lines: list[str]) -> list[Vi
         config_class_name = _resolve_config_class_name_from_modeling_class(
             node.name, class_to_bases, class_to_assignments
         )
+        target_config_class_name = _resolve_target_config_class_name(config_classes, node.name, config_class_name)
+        if target_config_class_name is None:
+            continue
         if _config_has_tie_word_embeddings(config_classes, node.name, config_class_name):
             continue
         violations.append(
@@ -232,9 +246,9 @@ def check(tree: ast.Module, file_path: Path, source_lines: list[str]) -> list[Vi
                 file_path=file_path,
                 line_number=node.lineno,
                 message=(
-                    f"{RULE_ID}: {node.name} defines _tied_weights_keys but {config_path.name} "
-                    f"does not declare tie_word_embeddings. Add a top-level "
-                    f"'tie_word_embeddings: bool = ...' field to the config class."
+                    f"{RULE_ID}: {node.name} defines _tied_weights_keys but {config_path.name} maps to "
+                    f"{target_config_class_name}, which does not declare tie_word_embeddings. Add a top-level "
+                    f"'tie_word_embeddings: bool = ...' field to {target_config_class_name}."
                 ),
             )
         )

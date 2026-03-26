@@ -706,6 +706,7 @@ class FooForCausalLM(FooPreTrainedModel):
             trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
             self.assertEqual(len(trf014), 1)
             self.assertIn("tie_word_embeddings", trf014[0].message)
+            self.assertIn("FooConfig", trf014[0].message)
 
     def test_trf014_empty_tied_weights_keys_no_violation(self):
         """Empty _tied_weights_keys — no violation even without config field."""
@@ -776,6 +777,7 @@ class FooForConditionalGeneration(FooPreTrainedModel):
             trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
             self.assertEqual(len(trf014), 1)
             self.assertIn("tie_word_embeddings", trf014[0].message)
+            self.assertIn("FooConfig", trf014[0].message)
 
     def test_trf014_config_file_suffix_matching(self):
         """When multiple config files exist, matches by suffix (modeling_foo_text -> configuration_foo_text)."""
@@ -829,6 +831,8 @@ class FooForConditionalGeneration(FooPreTrainedModel):
             trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
             self.assertEqual(len(trf014), 1)
             self.assertIn("tie_word_embeddings", trf014[0].message)
+            self.assertIn("FooConfig", trf014[0].message)
+            self.assertNotIn("FooVisionConfig", trf014[0].message)
 
     def test_trf014_resolves_inherited_config_class(self):
         """The tied model should use its resolved config_class, not the shortest class-name prefix."""
