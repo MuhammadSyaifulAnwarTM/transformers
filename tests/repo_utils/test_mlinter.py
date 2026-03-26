@@ -751,13 +751,16 @@ class FooForCausalLM(FooPreTrainedModel):
             trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
             self.assertEqual(trf014, [])
 
-    def test_trf014_composite_with_text_config_no_violation(self):
-        """Composite config with sub_configs text_config — no violation."""
+    def test_trf014_main_composite_requires_top_level_tie_word_embeddings(self):
+        """A main composite config must declare tie_word_embeddings itself."""
         with tempfile.TemporaryDirectory() as tmpdir:
             model_dir = Path(tmpdir)
             config_source = """
+class FooTextConfig(PreTrainedConfig):
+    tie_word_embeddings: bool = True
+
 class FooConfig(PreTrainedConfig):
-    sub_configs = {"text_config": AutoConfig, "vision_config": AutoConfig}
+    sub_configs = {"text_config": FooTextConfig, "vision_config": AutoConfig}
 """
             (model_dir / "configuration_foo.py").write_text(config_source)
 
@@ -771,7 +774,8 @@ class FooForConditionalGeneration(FooPreTrainedModel):
             file_path = model_dir / "modeling_foo.py"
             violations = mlinter.analyze_file(file_path, modeling_source, enabled_rules={mlinter.TRF014})
             trf014 = [v for v in violations if v.rule_id == mlinter.TRF014]
-            self.assertEqual(trf014, [])
+            self.assertEqual(len(trf014), 1)
+            self.assertIn("tie_word_embeddings", trf014[0].message)
 
     def test_trf014_config_file_suffix_matching(self):
         """When multiple config files exist, matches by suffix (modeling_foo_text -> configuration_foo_text)."""
@@ -832,6 +836,7 @@ class FooForConditionalGeneration(FooPreTrainedModel):
             model_dir = Path(tmpdir)
             config_source = """
 class FooConfig(PreTrainedConfig):
+    sub_configs = {"text_config": FooTextConfig, "vision_config": AutoConfig}
     hidden_size: int = 768
 
 class FooTextConfig(PreTrainedConfig):

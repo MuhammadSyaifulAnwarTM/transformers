@@ -64,16 +64,6 @@ def _class_has_tie_word_embeddings(config_node: ast.ClassDef) -> bool:
         if base_name not in _PRETRAINED_CONFIG_NAMES and base_name.endswith("Config"):
             return True
 
-    assignments = _get_class_assignments(config_node)
-
-    # If the config uses sub_configs with a text_config, the text sub-config
-    # handles tie_word_embeddings (e.g. composite vision-language models).
-    sub_configs = assignments.get("sub_configs")
-    if isinstance(sub_configs, ast.Dict):
-        for key in sub_configs.keys:
-            if isinstance(key, ast.Constant) and key.value == "text_config":
-                return True
-
     # Check class-level assignments (both plain and annotated)
     for item in config_node.body:
         if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
@@ -243,8 +233,8 @@ def check(tree: ast.Module, file_path: Path, source_lines: list[str]) -> list[Vi
                 line_number=node.lineno,
                 message=(
                     f"{RULE_ID}: {node.name} defines _tied_weights_keys but {config_path.name} "
-                    f"does not declare tie_word_embeddings. Add 'tie_word_embeddings: bool = True' "
-                    f"to the config class."
+                    f"does not declare tie_word_embeddings. Add a top-level "
+                    f"'tie_word_embeddings: bool = ...' field to the config class."
                 ),
             )
         )
