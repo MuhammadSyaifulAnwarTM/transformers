@@ -30,7 +30,6 @@ from transformers import (
     ContinuousBatchingConfig,
     GenerationConfig,
     GenerationMixin,
-    LogitsProcessorList,
     StaticCache,
 )
 from transformers.generation.continuous_batching.cache import (
@@ -42,7 +41,6 @@ from transformers.generation.continuous_batching.cache_manager import FullAttent
 from transformers.generation.continuous_batching.continuous_api import ContinuousBatchProcessor
 from transformers.generation.continuous_batching.input_outputs import build_attention_mask
 from transformers.testing_utils import (
-    Expectations,
     require_deterministic_for_xpu,
     require_flash_attn,
     require_kernels,
@@ -675,12 +673,11 @@ class ContinuousBatchingWithAcceleratorTest(unittest.TestCase):
             max_new_tokens=10,
             do_sample=False,
             output_scores=True,
-            eos_token_id=eos_token_id
+            eos_token_id=eos_token_id,
         )
 
         # Compare log_probs for each request, matching by prompt_ids
         for i, cb_output in enumerate(cb_outputs.values()):
-
             # Compare Cb and regular generate outputs
             cb_output_ids = cb_output.generated_tokens
             regular_output_ids = regular_outputs[i]
@@ -856,7 +853,6 @@ class ContinuousBatchingWithAcceleratorTest(unittest.TestCase):
             continuous_batching_config=ContinuousBatchingConfig(block_size=32),
         )
         with cb_context_manager as manager:
-
             # Create a request with at least 32 tokens but less than 64 so prefill only generates one complete block
             inputs = get_generation_inputs([input_msg], tokenizer, for_continuous_batching=True)[0]
             self.assertGreaterEqual(len(inputs), 32, f"Input length is {len(inputs)} instead of at least 32")
@@ -1147,7 +1143,7 @@ class ContinuousBatchingWithAcceleratorTest(unittest.TestCase):
             max_new_tokens=max_new_tokens,
             do_sample=False,
             output_scores=True,
-            eos_token_id=eos_token_id
+            eos_token_id=eos_token_id,
         )
         # Compare outputs
         self.assertEqual(results[req0_id].generated_tokens, regular_generated_tokens[0])
@@ -1177,7 +1173,7 @@ class ContinuousBatchingWithAcceleratorTest(unittest.TestCase):
             max_new_tokens=max_new_tokens,
             do_sample=False,
             output_scores=True,
-            eos_token_id=eos_token_id
+            eos_token_id=eos_token_id,
         )
         # Compare outputs
         self.assertEqual(results[req1_id].generated_tokens, regular_generated_tokens[0])
@@ -1185,4 +1181,3 @@ class ContinuousBatchingWithAcceleratorTest(unittest.TestCase):
         for j, (cb_lp, exp_lp) in enumerate(zip(results[req1_id].logprobs, regular_logprobs[0])):
             error_msg = f"Request 1: logprob mismatch at position {j}: CB={cb_lp}, expected={exp_lp}"
             self.assertAlmostEqual(cb_lp, exp_lp, delta=delta, msg=error_msg)
-
